@@ -16,8 +16,6 @@ path_counts_traffic = collections.defaultdict(int)
 def test_with_one_target(pcaps: TraffGenerate, sniff: Sniff):
     ip_dst = "172.172.174.1"
     total_ips = 0
-    with allure.step("Проверка состояния установленных маршрутов"):
-        pass
     with allure.step("Генерируем IP-пакеты, а также подсчитываем распределение этих пакетов по линкам"):
         for octet in range(1, 254):
             ip_str = f"10.10.10.{octet}"
