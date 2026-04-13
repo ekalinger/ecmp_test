@@ -1,5 +1,15 @@
 #!/bin/bash
+export PATH=$PATH:/sbin
+
 apt install frr frr-pythontools -y
+cp frr/frr.conf /etc/frr/frr.conf
+cp frr/daemons /etc/frr/daemons
+systemctl reload frr
+apt install tcpdump -y
+apt install nodejs npm -y
+anpm install -g allure-commandline -y
+apt install default-jre -y
+
 ip -all netns delete
 
 ip netns add r1
@@ -40,13 +50,22 @@ ip netns exec r2 ip link set lo up
 
 ip netns exec r2 ip addr add 172.172.174.1/24 dev lo
 
-ip netns exec r1 sysctl -w net/ipv4/fib_multipath_hash_policy=3
-ip netns exec r2 sysctl -w net/ipv4/fib_multipath_hash_policy=3
-ip netns exec r1 sysctl -w net.ipv4.fib_multipath_hash_fields = 1
-ip netns exec r2 sysctl -w net.ipv4.fib_multipath_hash_fields = 1
-sysctl -w net.ipv4.ip_forward = 1
-ip netns exec r1 sysctl -w net.ipv4.ip_forward = 1
-ip netns exec r2 sysctl -w net.ipv4.ip_forward = 1
+############################################################
+# uncomment if linux core version >= 5.14
+#ip netns exec r1 sysctl -w net/ipv4/fib_multipath_hash_policy=3
+#ip netns exec r2 sysctl -w net/ipv4/fib_multipath_hash_policy=3
+#ip netns exec r1 sysctl -w net.ipv4.fib_multipath_hash_fields=1
+#ip netns exec r2 sysctl -w net.ipv4.fib_multipath_hash_fields=1
+
+############################################################
+# uncomment if linux core version < 5.14
+ip netns exec r1 sysctl -w net/ipv4/fib_multipath_hash_policy=0
+ip netns exec r2 sysctl -w net/ipv4/fib_multipath_hash_policy=0
+
+
+sysctl -w net.ipv4.ip_forward=1
+ip netns exec r1 sysctl -w net.ipv4.ip_forward=1
+ip netns exec r2 sysctl -w net.ipv4.ip_forward=1
 
 ip netns exec r1 sysctl -w net.ipv4.conf.lo.rp_filter=0
 ip netns exec r1 sysctl -w net.ipv4.conf.veth-r1-input.rp_filter=0
