@@ -9,9 +9,10 @@ class Sniff:
         self.process_list: list[subprocess.Popen] = []
         self.number_link = number_link
 
-    def run(self, router_name: str):
+    def run(self, router_name: str, expression: str = None):
+        exp = expression if expression else ""
         for i in range(1, self.number_link+1):
-            command = f"ip netns exec {router_name} tcpdump -i output{i} -w /tmp/output{i}.pcap"
+            command = f"ip netns exec {router_name} tcpdump -i output{i} {exp} -w /tmp/output{i}.pcap"
             self.process_list.append(subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True))
     
     def stop(self):
