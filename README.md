@@ -1,7 +1,7 @@
 # ECMP TEST
 ***Схема:***
 
-![Схема](https://github.com/ekalinger/ecmp_test/tree/fix-test/fix-test/network.png)
+![Схема](https://github.com/ekalinger/ecmp_test/raw/fix-test/network.png)
   
 R1, R2 - namespaces  
 input, OSPF - линки veth(3 штуки)  
