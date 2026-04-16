@@ -7,9 +7,13 @@ cp frr/daemons /etc/frr/daemons
 systemctl reload frr
 apt install tcpdump -y
 apt install nodejs npm -y
-anpm install -g allure-commandline -y
+npm install -g allure-commandline -y
 apt install default-jre -y
 
+ip netns exec r1 ip link del veth-r1-input
+ip netns exec r1 ip link del veth-r1-l2
+ip netns exec r1 ip link del veth-r1-l3
+ip netns exec r1 ip link del veth-r1-l4
 ip -all netns delete
 
 ip netns add r1
@@ -19,7 +23,8 @@ ip link add veth-r1-input type veth peer name input
 ip link set veth-r1-input netns r1
 ip netns exec r1 ip link set veth-r1-input up
 ip link set input up
-ip netns exec r1 ip addr add 10.0.1.1/24 dev veth-r1-input
+ip netns exec r1 ip addr add 10.0.1.1/32 peer 10.0.1.2/32 dev veth-r1-input
+ip addr add 10.0.1.2/32 peer 10.0.1.1/32 dev input
 
 ip link add veth-r1-l2 type veth peer name output1
 ip link set veth-r1-l2 netns r1
@@ -50,25 +55,29 @@ ip netns exec r2 ip link set lo up
 
 ip netns exec r2 ip addr add 172.172.174.1/24 dev lo
 
-############################################################
-# uncomment if linux core version >= 5.14
-#ip netns exec r1 sysctl -w net/ipv4/fib_multipath_hash_policy=3
-#ip netns exec r2 sysctl -w net/ipv4/fib_multipath_hash_policy=3
-#ip netns exec r1 sysctl -w net.ipv4.fib_multipath_hash_fields=1
-#ip netns exec r2 sysctl -w net.ipv4.fib_multipath_hash_fields=1
+MIN_VERSION="5.14.0"
+CURRENT_VERSION=$(uname -r)
 
-############################################################
-# uncomment if linux core version < 5.14
-ip netns exec r1 sysctl -w net/ipv4/fib_multipath_hash_policy=0
-ip netns exec r2 sysctl -w net/ipv4/fib_multipath_hash_policy=0
-
+if [ "$(printf '%s\n' "$MIN_VERSION" "$CURRENT_VERSION" | sort -V | head -n1)" = "$MIN_VERSION" ]; then
+    echo "Устанавливаем опцию ядра ECMP только по IP source"
+    ip netns exec r1 sysctl -w net/ipv4/fib_multipath_hash_policy=3
+    ip netns exec r2 sysctl -w net/ipv4/fib_multipath_hash_policy=3
+    ip netns exec r1 sysctl -w net.ipv4.fib_multipath_hash_fields=1
+    ip netns exec r2 sysctl -w net.ipv4.fib_multipath_hash_fields=1
+else
+    echo "Устанавливаем опцию ядра ECMP по IP source и IP destination"
+    ip netns exec r1 sysctl -w net/ipv4/fib_multipath_hash_policy=0
+    ip netns exec r2 sysctl -w net/ipv4/fib_multipath_hash_policy=0
+fi
 
 sysctl -w net.ipv4.ip_forward=1
+sysctl -w net.ipv4.conf.input.accept_local=1
 ip netns exec r1 sysctl -w net.ipv4.ip_forward=1
 ip netns exec r2 sysctl -w net.ipv4.ip_forward=1
 
 ip netns exec r1 sysctl -w net.ipv4.conf.lo.rp_filter=0
 ip netns exec r1 sysctl -w net.ipv4.conf.veth-r1-input.rp_filter=0
+ip netns exec r1 sysctl -w net.ipv4.conf.veth-r1-input.accept_local=1
 ip netns exec r1 sysctl -w net.ipv4.conf.veth-r1-l2.rp_filter=0
 ip netns exec r1 sysctl -w net.ipv4.conf.veth-r1-l3.rp_filter=0
 ip netns exec r1 sysctl -w net.ipv4.conf.veth-r1-l4.rp_filter=0
