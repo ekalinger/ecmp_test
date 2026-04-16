@@ -2,6 +2,7 @@ from scapy.all import *
 import subprocess
 import random
 
+
 class Sniff:
     """For sniff traffic"""
 
@@ -33,3 +34,17 @@ class TraffGenerate:
     
     def get_pcap(self):
         return self.packet_db
+
+class TraffAnalyze:
+    """For unpack traffic and analyze header"""
+
+    @staticmethod
+    def get_source_ip_list_by_path(path_to_file: str) -> list[str]:
+        result = []
+        file = rdpcap(path_to_file)
+        for pack in file:
+            if pack.haslayer(IP):
+                result.append(pack[IP].src)
+        return result
+
+    

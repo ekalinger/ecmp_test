@@ -3,7 +3,7 @@ from functools import total_ordering
 import allure
 import pytest
 import time
-from fixtures.packets import TraffGenerate, Sniff
+from fixtures.packets import TraffGenerate, Sniff, TraffAnalyze
 from scapy.all import sendp, rdpcap
 import subprocess
 
@@ -29,6 +29,7 @@ def test_with_one_target(pcaps: TraffGenerate, sniff: Sniff):
         time.sleep(2)
         sendp(pcaps.get_pcap(), iface=INPUT_IFACE, return_packets=True)
         time.sleep(5)
+        sniff.stop()
     
     with allure.step("Подсчет количества пакетов, полученных с выходных интерфейсов"):
         recieved_packets = 0
@@ -46,19 +47,30 @@ def test_with_one_target(pcaps: TraffGenerate, sniff: Sniff):
         assert recieved_packets == total_ips, pytest.fail(f"Количество отправленных{total_ips} не равно количеству принятых{recieved_packets}")
 
     with allure.step("Анализ соотношений ожидаемых и полученных пакетов по путям"):
-        out_str = f"Анализ ECMP для {total_ips} источников по {num_paths} путям:\n"
-        out_str += f"{'Path':<10} | {'Expected packets':<10} | {'Received packets':<10}\n"
-        out_str += "--------------------------------------------------------\n"
         for path in range(num_paths):
-            rec_count = path_counts_traffic[path]
-            out_str += f"{path:<10} | {packet_distribution:<16} | {rec_count:<10}\n"
-        allure.attach(f"\n{out_str}Большая разница между ожидаемым и полученным сообщает о некорректности работы", attachment_type=allure.attachment_type.TEXT)
+            recv_packets = path_counts_traffic[path]
+            result = (abs(recv_packets - packet_distribution) / packet_distribution) * 100
+            assert result < 15, pytest.fail(f"Неравномерное распределение пакетов от ожидаемого: {packet_distribution} больше чем на 15%. \
+                                            Полученные пакеты: {recv_packets}, путь: {path}")
 
     with allure.step("Расчет равномерности (Variance) полученного траффика"):
         counts = list(path_counts_traffic.values())
         if len(counts) > 0:
             variance = max(counts) - min(counts)
             allure.attach(f"\nРазница между макс/мин путем: {variance} (меньше = лучше)", attachment_type=allure.attachment_type.TEXT)
+
+    with allure.step("Проверка уникальности пакетов внутри одного дампа и между линками"):
+        result = {}
+        big_len = 0
+        for i in range(1, num_paths+1):
+            pcap_path = f"/tmp/output{i}.pcap"
+            ips_list = TraffAnalyze.get_source_ip_list_by_path(pcap_path)
+            ips_set = set(ips_list)
+            assert len(ips_list) == len(ips_set), pytest.fail(f"Внутри линка {i-1} есть задублированные пакеты")
+            result[i-1] = ips_set
+            big_len += len(ips_set)
+        big_set = set().union(*result.values())
+        assert len(big_set) == big_len, pytest.fail("Есть дубли между линками")
 
 def test_with_link_down(pcaps: TraffGenerate, sniff: Sniff):
     ip_dst = "172.172.174.1"
@@ -78,6 +90,7 @@ def test_with_link_down(pcaps: TraffGenerate, sniff: Sniff):
         time.sleep(2)
         sendp(pcaps.get_pcap(), iface=INPUT_IFACE, return_packets=True)
         time.sleep(5)
+        sniff.stop()
     
     with allure.step("Подсчет количества пакетов, полученных с выходных интерфейсов"):
         recieved_packets = 0
