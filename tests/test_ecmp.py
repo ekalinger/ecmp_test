@@ -1,4 +1,5 @@
 import collections
+from functools import total_ordering
 import allure
 import pytest
 import time
@@ -42,7 +43,7 @@ def test_with_one_target(pcaps: TraffGenerate, sniff: Sniff):
                 attachment_type="application/octet-stream", 
                 extension="pcap"
             )
-        assert recieved_packets == total_ips, pytest.fail("Количество отправленных не равно количеству принятых")
+        assert recieved_packets == total_ips, pytest.fail(f"Количество отправленных{total_ips} не равно количеству принятых{recieved_packets}")
 
     with allure.step("Анализ соотношений ожидаемых и полученных пакетов по путям"):
         out_str = f"Анализ ECMP для {total_ips} источников по {num_paths} путям:\n"
